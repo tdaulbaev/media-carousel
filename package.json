@@ -1,0 +1,38 @@
+{
+  "name": "@tdaulbaev/media-carousel",
+  "version": "1.0.0",
+  "description": "media carousel",
+  "main": "./lib/index.js",
+  "files": [
+    "lib/*"
+  ],
+  "scripts": {
+    "clean": "rm -rf ./lib",
+    "build": "npm run clean && npm run build:js",
+    "build:js": "uglifyjs ./src/index.js -c -m -o ./lib/index.js",
+    "semantic-release": "semantic-release",
+    "prepack": "npm run build"
+  },
+  "release": {
+    "branches": [
+      "main"
+    ]
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tdaulbaev/media-carousel.git"
+  },
+  "keywords": [],
+  "author": "Timur Daulbaev",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/tdaulbaev/media-carousel/issues"
+  },
+  "homepage": "https://github.com/tdaulbaev/media-carousel#readme",
+  "devDependencies": {
+    "uglify-js": "^3.17.4"
+  }
+}
