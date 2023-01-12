@@ -1,9 +1,18 @@
 import { getWidth } from "./utils";
 import debounce from "./utils/debounced";
 
-export const invertValue = (value) => {
-    if (value < 0) return Math.abs(value);
-    return -value;
+const interpretEvent = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+};
+
+const getMaxOffsetValue = (x, y, max) => {
+    const posX = Math.abs(x);
+    const poxY = Math.abs(y);
+    if (posX >= max || poxY >= max) {
+        return posX >= poxY ? (max * x) / max : (max * y) / max;
+    }
+    return posX >= poxY ? x : y;
 };
 
 // const duplicateChildren = (container) => {
@@ -28,15 +37,17 @@ class MediaCarousel {
         this.options = {
             fps: Math.ceil(1000 / fps),
             scrollVelocityRatio: 1,
+            maxScrollMovement: 250,
             debounceWaitTime: 500,
             ...otherOptions,
         };
         this.container = container;
         this.touchContainer = touchContainer;
-        this.totalWidth = (getWidth(container) / 2);
-        this.playing = false;
+        this.totalWidth = getWidth(container) / 2;
+        this.animating = false;
+        this.autoPlay = false;
         this.offset = 0;
-        this.touchStartPosition = 0;
+        this.touchStartPosition = [0, 0];
         this.dragStartPosition = 0;
         this.dragInProgress = false;
         this.touchInProgress = false;
@@ -47,26 +58,43 @@ class MediaCarousel {
         this.onDragStart = this.onDragStart.bind(this);
         this.onDragMove = this.onDragMove.bind(this);
         this.onDragEnd = this.onDragEnd.bind(this);
+        this.onWheel = this.onWheel.bind(this);
         this.connectObserver();
     }
 
     trackDragAndTouchEvents() {
         this.listenTouchEvents();
         this.listenDragEvents();
+        this.listenWheelEvent();
     }
 
     play() {
-        this.playing = true;
-        this.autoPlayDraw();
+        this.animating = true;
+        this.autoPlay = true;
+        this.draw();
     }
 
     stop() {
-        this.playing = false;
+        this.animating = false;
+        this.autoPlay = false;
+    }
+
+    restoreAutoPlay = debounce(this.autoPlayStart.bind(this), 300);
+
+    autoPlayStart() {
+        this.autoPlay = true;
+    }
+
+    autoPlayStop() {
+        this.autoPlay = false;
     }
 
     connectObserver() {
         if (window.ResizeObserver) {
-            const onResize = debounce(this.update.bind(this), this.options.debounceWaitTime);
+            const onResize = debounce(
+                this.update.bind(this),
+                this.options.debounceWaitTime
+            );
             this.resizeObserver = new ResizeObserver(onResize);
             this.resizeObserver.observe(this.container);
         }
@@ -79,61 +107,72 @@ class MediaCarousel {
     }
 
     update() {
-        this.totalWidth = (getWidth(this.container) / 2);
+        this.totalWidth = getWidth(this.container) / 2;
     }
 
     onTouchStart(e) {
-        this.stop()
+        interpretEvent(e);
+        this.autoPlayStop();
         this.touchInProgress = true;
-        e.preventDefault();
-        e.stopPropagation();
-        const touch = e.touches[0];
-        this.touchStartPosition = touch.clientX;
+        const t = e.touches[0];
+        this.touchStartPosition = [t.pageX, t.pageY];
     }
 
     onTouchMove(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        var t,
-            r = null === (t = e.touches) || void 0 === t ? void 0 : t[0].clientX;
-        const nextPosition = this.offset + invertValue(this.touchStartPosition - r);
-        this.touchStartPosition = r;
-        this.setPosition(nextPosition)
-        this.movePlayDraw();
+        interpretEvent(e);
+        if (this.touchInProgress) {
+            const t = e.touches[0];
+            const diffX = t.pageX - this.touchStartPosition[0];
+            const diffY = t.pageY - this.touchStartPosition[1];
+            this.touchStartPosition = [t.pageX, t.pageY];
+            const nextPosition = this.offset + diffX + diffY;
+            this.setPosition(nextPosition);
+        }
     }
 
     onTouchEnd(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.touchInProgress = false;
-        this.play();
+        interpretEvent(e);
+        if (this.touchInProgress) {
+            this.touchInProgress = false;
+            this.autoPlayStart();
+        }
     }
 
     onDragStart(e) {
-        this.stop();
-        e.preventDefault();
-        e.stopPropagation();
+        interpretEvent(e);
+        this.autoPlayStop();
         this.dragInProgress = true;
         this.dragStartPosition = e.pageX;
     }
 
     onDragMove(e) {
-        e.preventDefault();
-        e.stopPropagation();
+        interpretEvent(e);
         if (this.dragInProgress) {
             const diffX = e.pageX - this.dragStartPosition;
             const nextPosition = this.offset + diffX;
             this.dragStartPosition = e.pageX;
-            this.setPosition(nextPosition)
-            this.movePlayDraw();
+            this.setPosition(nextPosition);
         }
     }
 
     onDragEnd(e) {
-        e.preventDefault();
-        e.stopPropagation();
-        this.dragInProgress = false;
-        this.play();
+        interpretEvent(e);
+        if (this.dragInProgress) {
+            this.dragInProgress = false;
+            this.autoPlayStart();
+        }
+    }
+
+    onWheel(e) {
+        interpretEvent(e);
+        this.autoPlayStop();
+        const { deltaX, deltaY } = e;
+        const offset =
+            getMaxOffsetValue(deltaX, deltaY, this.options.maxScrollMovement) *
+            this.options.scrollVelocityRatio;
+        const nextPosition = this.offset - offset;
+        this.setPosition(nextPosition);
+        this.restoreAutoPlay();
     }
 
     listenTouchEvents() {
@@ -162,10 +201,19 @@ class MediaCarousel {
         this.touchContainer.removeEventListener("mouseleave", this.onDragEnd);
     }
 
+    listenWheelEvent() {
+        this.touchContainer.addEventListener("wheel", this.onWheel);
+    }
+
+    removeWheelEventListener() {
+        this.touchContainer.removeEventListener("wheel", this.onWheel);
+    }
+
     setPosition(nextPosition) {
         if (this.isMinOffset(nextPosition)) {
             return (this.offset = nextPosition - this.totalWidth);
-        } else if (this.isMaxOffset(nextPosition)) {
+        }
+        if (this.isMaxOffset(nextPosition)) {
             return (this.offset = -(this.totalWidth + nextPosition));
         }
         return (this.offset = nextPosition);
@@ -179,31 +227,17 @@ class MediaCarousel {
         return Math.abs(nextPosition) >= this.totalWidth;
     }
 
-    scroll(offset) {
-        const nextPosition = this.offset + offset * this.options.scrollVelocityRatio;
-        this.setPosition(nextPosition);
-    }
-
     calcNextPosition() {
         const nextPosition = this.offset - this.offsetPerTick;
         this.setPosition(nextPosition);
     }
 
-    autoPlayDraw() {
-        if (this.playing) {
+    draw() {
+        if (this.animating) {
             this.timer = setTimeout(() => {
-                this.tickID = requestAnimationFrame(this.autoPlayDraw.bind(this));
+                this.tickID = requestAnimationFrame(this.draw.bind(this));
                 this.container.style = `transform: translate3d(${this.offset}px, 0px, 0px);`;
-                this.calcNextPosition();
-            }, this.options.fps);
-        }
-    }
-
-    movePlayDraw() {
-        if (this.dragInProgress || this.touchInProgress) {
-            this.timer = setTimeout(() => {
-                this.tickID = requestAnimationFrame(this.movePlayDraw.bind(this));
-                this.container.style = `transform: translate3d(${this.offset}px, 0px, 0px);`;
+                if (this.autoPlay) this.calcNextPosition();
             }, this.options.fps);
         }
     }
@@ -211,7 +245,8 @@ class MediaCarousel {
     destroy() {
         this.removeTouchEventsListener();
         this.removeDragEventsListener();
-        this.playing = false;
+        this.removeWheelEventListener();
+        this.stop();
         this.disconnectObserver();
         // removeDuplicateChildren(this.container);
         if (this.timer) {
