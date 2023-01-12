@@ -21,12 +21,10 @@ To startup and destroy
     options: {}
   });
   
-  carousel.trackDragAndTouchEvents();
   carousel.play();
   
   // destroy callback
   return () => {
-    carousel.stop();
     carousel.destroy();
   }
 ```

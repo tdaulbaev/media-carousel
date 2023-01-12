@@ -60,9 +60,10 @@ class MediaCarousel {
         this.onDragEnd = this.onDragEnd.bind(this);
         this.onWheel = this.onWheel.bind(this);
         this.connectObserver();
+        this.trackUserEvents();
     }
 
-    trackDragAndTouchEvents() {
+    trackUserEvents() {
         this.listenTouchEvents();
         this.listenDragEvents();
         this.listenWheelEvent();
