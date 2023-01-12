@@ -22,13 +22,14 @@ export const invertValue = (value) => {
 // };
 
 class MediaCarousel {
-    constructor({ container, touchContainer, options }) {
+    constructor({ container, touchContainer, options = {} }) {
         // duplicateChildren(container);
+        const { fps = 60, ...otherOptions } = options;
         this.options = {
-            fps: Math.ceil(1000 / 60),
+            fps: Math.ceil(1000 / fps),
             scrollVelocityRatio: 1,
             debounceWaitTime: 500,
-            ...options,
+            ...otherOptions,
         };
         this.container = container;
         this.touchContainer = touchContainer;

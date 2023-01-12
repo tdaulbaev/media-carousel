@@ -3,13 +3,13 @@
 To install
 
 ```bash
-npm install @tdaulbaev/media-carousel
+npm install @timdaulbaev/media-carousel
 ```
 
 To import
 
 ```bash
-import MediaCarousel from "@tdaulbaev/media-carousel";
+import MediaCarousel from "@timdaulbaev/media-carousel";
 ```
 
 To startup and destroy
